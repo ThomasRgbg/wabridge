@@ -17,7 +17,7 @@ My wonderful wife would like to chat to her mother. But she don't like to have a
 
 ```
 +-----+                        +------+                           +--------+
-|     |----[wa_user.py - 1]****|      |****[xmpp_user.py - MiL]===|        |=====
+|     |----[wa_user.py - 1]****|      |****[xmpp_user.py - MiL]===|        |
 |     |                        | ZMQ  |                           |        |
 | WA  |                        |      |                           |  XMPP  |
 |     |                        |      |                           | Server |
@@ -37,6 +37,10 @@ So this is a pretty crappy concept, but it works for my purpose. For each (virtu
 So the point is, in the picture above the wa_user corresponds your own real xmpp-client, while the xmpp_user.py to the WA user you want talk to. 
 
 Here in the example there is only one user on each side, but this works also with multiple users on both sides. But since there is own instance running, it scales very bad. 
+
+## Limitations
+
+This is just a simple set of scripts and many things could be better, so [here](https://github.com/ThomasRgbg/wabridge/issues?q=is%3Aissue+is%3Alimiation) is a list of them.
 
 
 
