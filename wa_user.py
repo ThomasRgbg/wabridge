@@ -10,16 +10,14 @@
 from zmqhandler import ZMQReceiver
 
 from wa_layer import ChatLayer
-from yowsup.layers.auth                        import YowAuthenticationProtocolLayer
-from yowsup.layers.protocol_messages           import YowMessagesProtocolLayer
-from yowsup.layers.protocol_receipts           import YowReceiptProtocolLayer
-from yowsup.layers.protocol_acks               import YowAckProtocolLayer
 from yowsup.layers.network                     import YowNetworkLayer
-from yowsup.layers.coder                       import YowCoderLayer
-from yowsup.stacks import YowStack, YOWSUP_FULL_STACK_DEBUG, YOWSUP_FULL_STACK
 from yowsup.common import YowConstants
 from yowsup.layers import YowLayerEvent
-from yowsup.stacks import YowStack, YOWSUP_CORE_LAYERS
+from yowsup.stacks import YowStackBuilder
+from yowsup import env
+from yowsup.env import S40YowsupEnv
+
+from optparse import OptionParser
 
 import logging
 import time
@@ -27,32 +25,53 @@ import sys
 
 logger = logging.getLogger(__name__)
 
-CREDENTIALS = ("49123456", "xxxxxxxxxxxxxxxxxxx=") # TODO: make commandline parameter
+CREDENTIALS = ("491711234567", "ABCDEDFADFADFADDFADFADF=") # TODO: make commandline parameter
 
 if __name__==  "__main__":
 
     show_raw_packets = True
     all_output_to_file = False
+    encryptionEnabled = True
 
-    if all_output_to_file:
-        console_log = open('wa_user.log', 'w', 0)
+    optp = OptionParser()
+    
+    # Output verbosity options.
+    optp.add_option('-q', '--quiet', help='set logging to ERROR',
+                     action='store_const', dest='loglevel',
+                     const=logging.ERROR, default=logging.INFO)
+    optp.add_option('-d', '--debug', help='set logging to DEBUG',
+                     action='store_const', dest='loglevel',
+                     const=logging.DEBUG, default=logging.INFO)
+    optp.add_option('-v', '--verbose', help='set logging to COMM',
+                     action='store_const', dest='loglevel',
+                     const=5, default=logging.INFO)
+
+    optp.add_option("-l", "--logfile", dest="logfile",
+                    help="logfile to use")
+
+    opts, args = optp.parse_args()
+
+    if opts.logfile is not None:
+        console_log = open(opts.logfile, 'w', 0)
         sys.stdout = console_log
         sys.stderr = console_log
 
-    logging.basicConfig(level = logging.DEBUG) # TODO: Make commandline parameter
+    # Setup logging.
+    logging.basicConfig(level = opts.loglevel, datefmt='%H:%M:%S', format='%(asctime)s %(levelname)s:%(name)s:%(funcName)s:%(message)s')
 
-    if show_raw_packets:
-        layers = ( (ChatLayer,) + YOWSUP_FULL_STACK_DEBUG)
-    else:
-        layers = ( (ChatLayer,) + YOWSUP_FULL_STACK)
+    if not encryptionEnabled:
+        env.CURRENT_ENV = S40YowsupEnv()
+
+    stackBuilder = YowStackBuilder()
+
+    stack = stackBuilder\
+        .pushDefaultLayers(encryptionEnabled)\
+        .push(ChatLayer)\
+        .build()
 
     zmq = ZMQReceiver(CREDENTIALS[0] + '@s.whatsapp.net')
 
-    stack = YowStack(layers)
-    stack.setProp(YowAuthenticationProtocolLayer.PROP_CREDENTIALS, CREDENTIALS)         #setting credentials
-    stack.setProp(YowNetworkLayer.PROP_ENDPOINT, YowConstants.ENDPOINTS[0])    #whatsapp server address
-    stack.setProp(YowCoderLayer.PROP_DOMAIN, YowConstants.DOMAIN)              
-    stack.setProp(YowCoderLayer.PROP_RESOURCE, YowConstants.RESOURCE)          #info about us as WhatsApp client
+    stack.setCredentials(CREDENTIALS)
 
     stack.broadcastEvent(YowLayerEvent(YowNetworkLayer.EVENT_STATE_CONNECT))   #sending the connect signal
 
@@ -68,17 +87,18 @@ if __name__==  "__main__":
 
             (target, text) = zmq.poll_message()
             if target:
+                # pass
                 stack.setProp(ChatLayer.PROP_SEND_MSG_DETAILS, (target, text))
                 stack.broadcastEvent(YowLayerEvent(ChatLayer.EVENT_SEND_MESSAGE)) 
 
-            pingcount += 1
+            #pingcount += 1
 
-            if pingcount > 10:
-                pingcount=0
-                stack.broadcastEvent(YowLayerEvent(ChatLayer.EVENT_PING)) 
+            #if pingcount > 40:
+                #pingcount=0
+                # stack.broadcastEvent(YowLayerEvent(ChatLayer.EVENT_PING)) 
 
             # Angst-delay
-            time.sleep(0.1)
+            time.sleep(0.5)
 
     # if CTRL-C, send a disconnect. Otherwise WA will let us not in the next time
     except KeyboardInterrupt:

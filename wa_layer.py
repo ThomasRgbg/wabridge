@@ -41,6 +41,9 @@ from yowsup.layers.auth                                import YowAuthenticationP
 from yowsup.layers.network                             import YowNetworkLayer
 from yowsup.layers                                     import YowLayerEvent 
 
+
+
+
 from yowsup.common import YowConstants
 
 logger = logging.getLogger(__name__)
@@ -106,9 +109,20 @@ class ChatLayer(YowInterfaceLayer):
 
     @ProtocolEntityCallback("receipt")
     def onReceipt(self, entity):
-        ack = OutgoingAckProtocolEntity(entity.getId(), "receipt", "delivery")
+        ack = OutgoingAckProtocolEntity(entity.getId(), "receipt", entity.getType(), entity.getFrom())
         logger.debug('onReceipt: send ack')
         self.toLower(ack)
+
+    @ProtocolEntityCallback("notification")
+    def onNotification(self, notification):
+        notificationData = notification.__str__()
+        if notificationData:
+            logger.info('onNotification' + notificationData)
+        else:
+            logger.info("onNotification: From :%s, Type: %s" % (self.jidToAlias(notification.getFrom()), notification.getType()))
+        if self.sendReceipts:
+            receipt = OutgoingReceiptProtocolEntity(notification.getId(), notification.getFrom())
+            self.toLower(receipt)
 
     def onEvent(self, event):
         if event.getName() == ChatLayer.EVENT_SEND_MESSAGE:
@@ -117,16 +131,16 @@ class ChatLayer(YowInterfaceLayer):
             outgoingMessageProtocolEntity = TextMessageProtocolEntity(text, to=target)
             self.toLower(outgoingMessageProtocolEntity)
         elif event.getName() == ChatLayer.EVENT_PING:
-            #if self.assertConnected():
-            # print("onEvent: Ping")
-            entity = PingIqProtocolEntity(to = YowConstants.DOMAIN)
-            self.toLower(entity)
-            self.pingcount += 1
-            # print("Pingcount: {0}").format(self.pingcount)
-            if self.pingcount >= 10:
-                self.pingcount = 0
-                logger.info('onEvent: Pingcount reached, do disconnect')
-                self.disconnect_wa()
+            if self.assertConnected():
+                print("onEvent: Ping")
+                entity = PingIqProtocolEntity(to = YowConstants.DOMAIN)
+                self.toLower(entity)
+                self.pingcount += 1
+                print("Pingcount: {0}").format(self.pingcount)
+                if self.pingcount >= 10:
+                    self.pingcount = 0
+                    logger.info('onEvent: Pingcount reached, do disconnect')
+                    self.disconnect_wa()
         elif event.getName() == ChatLayer.EVENT_TERMINATE:
             logger.info('onEvent: got ChatLayer.EVENT_TERMINATE')
             self.terminate = True

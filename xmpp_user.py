@@ -1,8 +1,6 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-# based on https://github.com/fritzy/SleekXMPP/blob/develop/examples/echo_client.py
-
 # Hack for UTF on Python 2.x:
 import sys
 if sys.version_info < (3, 0):
@@ -65,6 +63,7 @@ class ChatBot(ClientXMPP):
         #     self.disconnect()
 
         # Check for new incomming message via ZMQ every 2 seconds
+        # TODO: In case of a reconnect, clean up first the old entry
         self.schedule('Check ZMQ', 2, self.check_zmq, repeat=True)
         self.logger.info('session_start done')
 
@@ -78,7 +77,7 @@ class ChatBot(ClientXMPP):
         toxmpp = str(string.split(toxmpp, '/')[0])
         text = unicode(msg['body'])
 
-        if fromxmpp == 'echobot1@xxxx.de':
+        if fromxmpp == 'schabelecho@felsenkuschler.de':
             self.logger.debug(u'incomming_message: replace {0} with {1}'.format(fromxmpp,msg['subject']) )
             fromxmpp = msg['subject']
 
@@ -119,10 +118,13 @@ if __name__ == '__main__':
     optp.add_option("-p", "--password", dest="password",
                     help="password to use")
 
+    optp.add_option("-l", "--logfile", dest="logfile",
+                    help="logfile to use")
+
     opts, args = optp.parse_args()
 
-    if all_output_to_file:
-        console_log = open('xmpp_user_{0}.log'.format(opts.jid), 'w', 0)
+    if opts.logfile is not None:
+        console_log = open(opts.logfile, 'w', 0)
         sys.stdout = console_log
         sys.stderr = console_log
 
@@ -138,7 +140,7 @@ if __name__ == '__main__':
 
     try:
         xmpp = ChatBot(opts.jid, opts.password)
-        if xmpp.connect(('xxxx.de','5222')):
+        if xmpp.connect(('server.de','5222')):
             xmpp.process(block=True)
         else:
             print('Unable to connect')
