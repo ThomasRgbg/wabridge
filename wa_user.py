@@ -18,14 +18,23 @@ from yowsup import env
 from yowsup.env import S40YowsupEnv
 
 from optparse import OptionParser
+import ConfigParser
 
 import logging
 import time
 import sys
+import os
 
 logger = logging.getLogger(__name__)
 
-CREDENTIALS = ("491711234567", "ABCDEDFADFADFADDFADFADF=") # TODO: make commandline parameter
+def get_config(config, section, option):
+    if not config.has_option(section, option):
+        return None
+    value = config.get(section, option)
+    if value is 'None':
+        return None
+    else:
+        return value
 
 if __name__==  "__main__":
 
@@ -49,6 +58,9 @@ if __name__==  "__main__":
     optp.add_option("-l", "--logfile", dest="logfile",
                     help="logfile to use")
 
+    optp.add_option("-c", "--config", dest="configfile",
+                    help="configfile")
+ 
     opts, args = optp.parse_args()
 
     if opts.logfile is not None:
@@ -58,6 +70,15 @@ if __name__==  "__main__":
 
     # Setup logging.
     logging.basicConfig(level = opts.loglevel, datefmt='%H:%M:%S', format='%(asctime)s %(levelname)s:%(name)s:%(funcName)s:%(message)s')
+
+    configfile = opts.configfile
+
+    config = ConfigParser.RawConfigParser()
+    if os.path.isfile(configfile):
+        config.read(configfile)
+    else:
+        print("No Configfile found at {0}".format(configfile))
+        sys.exit(1)
 
     if not encryptionEnabled:
         env.CURRENT_ENV = S40YowsupEnv()
@@ -69,9 +90,9 @@ if __name__==  "__main__":
         .push(ChatLayer)\
         .build()
 
-    zmq = ZMQReceiver(CREDENTIALS[0] + '@s.whatsapp.net')
+    zmq = ZMQReceiver(get_config(config, 'Credentials', 'user') + '@s.whatsapp.net')
 
-    stack.setCredentials(CREDENTIALS)
+    stack.setCredentials( (get_config(config, 'Credentials', 'user'),get_config(config, 'Credentials', 'password')) )
 
     stack.broadcastEvent(YowLayerEvent(YowNetworkLayer.EVENT_STATE_CONNECT))   #sending the connect signal
 
