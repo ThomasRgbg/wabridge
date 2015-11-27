@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 # Hack for UTF on Python 2.x:
@@ -14,6 +14,10 @@ import getpass
 import string
 
 from optparse import OptionParser
+
+import os.path
+import sys
+import configparser
 
 from sleekxmpp import ClientXMPP
 from sleekxmpp.exceptions import IqError, IqTimeout
@@ -72,27 +76,36 @@ class ChatBot(ClientXMPP):
         #if msg['type'] in ('chat', 'normal'):
         #    msg.reply("Thanks for sending\n%(body)s" % msg).send()
         fromxmpp = str(msg['from'])
-        fromxmpp = str(string.split(fromxmpp, '/')[0])
+        fromxmpp = fromxmpp.split('/')[0]
         toxmpp = str(msg['to'])
-        toxmpp = str(string.split(toxmpp, '/')[0])
-        text = unicode(msg['body'])
+        toxmpp = toxmpp.split('/')[0]
+        text = msg['body']
 
-        if fromxmpp == 'schabelecho@felsenkuschler.de':
-            self.logger.debug(u'incomming_message: replace {0} with {1}'.format(fromxmpp,msg['subject']) )
+        if fromxmpp == 'groupname@server.de':
+            self.logger.debug('incomming_message: replace {0} with {1}'.format(fromxmpp,msg['subject']) )
             fromxmpp = msg['subject']
 
-        self.logger.info(u"incoming_message: %s->%s:%s" % (fromxmpp, toxmpp, text) )
-        self.dispatcher.send2whats(fromxmpp, toxmpp, text)
+        self.logger.info("incoming_message: {0}->{1}:{2}".format(fromxmpp, toxmpp, text) )
+        self.dispatcher.send2whats(fromxmpp, toxmpp, text, fromxmpp)
 
     def send_textmessage(self, to, body):
         self.send_message(mto=to, mbody=body, mtype='chat')
         self.logger.info('send_textmessage: [to:{0}] {1}'.format(to,body) )
 
     def check_zmq(self):
-        (target, text) = self.zmq.poll_message()
+        (source, target, text, extra_data) = self.zmq.poll_message()
         if target:
-            self.logger.debug(u'check_zmq: got: [to:{0}] {1}'.format(target,text) )
+            self.logger.debug('check_zmq: got: [to:{0}] {1}'.format(target,text) )
             self.send_textmessage(to=target, body=text)
+
+def get_config(config, section, option):
+    if not config.has_option(section, option):
+        return None
+    value = config.get(section, option)
+    if value is 'None':
+        return None
+    else:
+        return value
 
 if __name__ == '__main__':
     all_output_to_file = True
@@ -118,25 +131,43 @@ if __name__ == '__main__':
     optp.add_option("-p", "--password", dest="password",
                     help="password to use")
 
+    optp.add_option("-c", "--config", dest="configfile",
+                    help="configfile")
+
     optp.add_option("-l", "--logfile", dest="logfile",
                     help="logfile to use")
 
     opts, args = optp.parse_args()
 
     if opts.logfile is not None:
-        console_log = open(opts.logfile, 'w', 0)
+        console_log = open(opts.logfile, 'a', 1, encoding='utf-8')
         sys.stdout = console_log
         sys.stderr = console_log
 
-
     # Setup logging.
-    logging.basicConfig(level=opts.loglevel,
-                        format='%(levelname)-8s %(message)s')
+    logging.basicConfig(level = opts.loglevel, datefmt='%H:%M:%S', format='%(asctime)s %(levelname)s:%(name)s:%(funcName)s:%(message)s')
+
+
+    configfile = opts.configfile
+
+    config = configparser.RawConfigParser()
+    if os.path.isfile(configfile):
+        config.read(configfile)
+    else:
+        print("No Configfile found at {0}".format(configfile))
+        sys.exit(1)
 
     if opts.jid is None:
-        opts.jid = raw_input("Username: ")
+        opts.jid = get_config(config, 'Credentials', 'jid')
     if opts.password is None:
-        opts.password = getpass.getpass("Password: ")
+        opts.password = get_config(config, 'Credentials', 'password')
+
+    if opts.jid is None:
+        print("No username found in configfile")
+        sys.exit(1)
+    if opts.password is None:
+        print("No password found in configfile")
+        sys.exit(1)
 
     try:
         xmpp = ChatBot(opts.jid, opts.password)

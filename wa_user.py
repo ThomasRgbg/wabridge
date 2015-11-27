@@ -1,4 +1,5 @@
-#!/usr/bin/python 
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 
 # Main program for whatsbridge - whatsapp side. 
 # Uses yowsup (from https://github.com/tgalal/yowsup)
@@ -6,6 +7,13 @@
 #      whatsapp_layer.py 
 #
 # Based on https://github.com/tgalal/yowsup/blob/master/yowsup/demos/echoclient/stack.py
+
+
+# Hack for UTF on Python 2.x:
+import sys
+if sys.version_info < (3, 0):
+    reload(sys)
+    sys.setdefaultencoding("UTF-8")
 
 from zmqhandler import ZMQReceiver
 
@@ -18,11 +26,13 @@ from yowsup import env
 from yowsup.env import S40YowsupEnv
 
 from optparse import OptionParser
-import ConfigParser
+if sys.version_info < (3, 0):
+    import ConfigParser as configparser
+else:
+    import configparser
 
 import logging
 import time
-import sys
 import os
 
 logger = logging.getLogger(__name__)
@@ -64,7 +74,10 @@ if __name__==  "__main__":
     opts, args = optp.parse_args()
 
     if opts.logfile is not None:
-        console_log = open(opts.logfile, 'w', 0)
+        if sys.version_info < (3, 0):
+            console_log = open(opts.logfile, 'a', 1)
+        else:
+            console_log = open(opts.logfile, 'a', 1, encoding='utf-8')
         sys.stdout = console_log
         sys.stderr = console_log
 
@@ -73,7 +86,7 @@ if __name__==  "__main__":
 
     configfile = opts.configfile
 
-    config = ConfigParser.RawConfigParser()
+    config = configparser.RawConfigParser()
     if os.path.isfile(configfile):
         config.read(configfile)
     else:
@@ -106,10 +119,12 @@ if __name__==  "__main__":
             # logger.debug('(re)starting main loop')
             stack.loop(timeout=2, count=1) # Let the taskloop run one time for 2 seconds 
 
-            (target, text) = zmq.poll_message()
+            (source, target, text, extra_data) = zmq.poll_message()
+
+
             if target:
-                # pass
-                stack.setProp(ChatLayer.PROP_SEND_MSG_DETAILS, (target, text))
+                text = text.encode('utf-8')
+                stack.setProp(ChatLayer.PROP_SEND_MSG_DETAILS, (source, target, text, extra_data))
                 stack.broadcastEvent(YowLayerEvent(ChatLayer.EVENT_SEND_MESSAGE)) 
 
             #pingcount += 1
